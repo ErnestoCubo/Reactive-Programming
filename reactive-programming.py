@@ -28,15 +28,28 @@ class App:
         url = self.input.get()
         asyncio.get_event_loop().run_until_complete(self.main(url))
 
-    def onSelect(self, event):
+    def onClick(self, event):
         position = self.listbox.curselection()
         imgName = self.listbox.get(position)
         index = self.imgs.index(imgName)
         imgSrc = self.bytesfoto[index]
         self.img = ImageTk.PhotoImage(data = imgSrc)
         self.canvas.create_image(20,20, anchor=NW, image=self.img)  
-
+        
+    ''' Función async main(self, urlToProcess)
+    Esta función recibe una URL que procesa para sacar todas las imágenes de la web, la función contiene a su vez otras dos definiciones de funciones locales.
     
+    self -- Se trata del propio objeto de la clase App que contiene las definciones del método __init__ explicado más abajo
+    urlToProcess -- URL que procesa la función de manera asíncrona
+    
+    FUNCIONAMIENTO:
+        La función recibe la URL realiza primero una petición asíncrona al servidor el cual le responde con source code de la web, este es parseado y a continuación
+        se pasa a extraer los elementos con el tag <img> cuando el programa extrae estos elementos va uno a uno para sacar tanto su nombre como el atributo SRC para
+        copiar su PATH actual y así usarlo para más tarde realizar una petición de nuevo al servidor donde se ubica la imagen y dependiendo del código status que se oibtenga
+        esta imagen es guardada en la pila o no, cuando se ha realizado la petición correcta se guardan los BYTES de la foto en una variable y más tarde en la pila de fotos
+        Por último el script usa el observable creado anteriormente para realizar las acciones finales como la progress bar, introducir las imágenes dentro del listbox o actualizar
+        el número de imágenes encontradas
+    '''
     async def main(self, urlToProcess):
         
         def checkImgAlt(imgName, imgSrc):
@@ -87,14 +100,22 @@ class App:
                     # Estoy comparando el Status ya que es con lo que se debería comparar al no ser necesariamente asíncrono 
                     # porque lo es implicitamente en la petición anterior al servidor
                     if responseStatus == 200:
-                        self.bytesfoto.append(imgBytes)
                         sys.stdout.write(bcolors.OKGREEN)
                         print(f'{imgName} : {imgSrc} -> STATUS OK : {responseStatus}')
                         sys.stdout.write(bcolors.ENDC)
+                        self.bytesfoto.append(imgBytes)
+                        self.imgs.append(imgName)
+                        self.contador += 1
                     else:
                         sys.stdout.write(bcolors.FAIL)
                         print(f'{imgName} : {imgSrc} -> STATUS FAILED : {responseStatus}')
                         sys.stdout.write(bcolors.ENDC)
+        self.obsImg.subscribe(
+            on_next = lambda img : (
+                self.listbox.insert(END, img)
+                
+            )
+        )
 
     """
     Definicion de los atributos de la clase iniciales donde se guardan los datos que se usaran en el tkinter para la GUI
@@ -128,7 +149,7 @@ class App:
         #Lista de imágenes
         self.listbox = Listbox(self.window)
         self.listbox.grid(column=0, row=2)
-        self.listbox.bind('<<ListboxSelect>>', self.onSelect)
+        self.listbox.bind('<<ListboxSelect>>', self.onClick)
 
         #Render de la foto
         self.canvas = Canvas(width=300, height=300)
