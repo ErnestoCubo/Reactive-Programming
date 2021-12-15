@@ -1,15 +1,10 @@
-import base64
-from typing import Counter
 import aiohttp
 import asyncio
-import aiofiles
-import io
 import rx
 import sys
 from tkinter import *
 from tkinter.ttk import *
-from urllib.request import urlopen
-from PIL import ImageTk, Image
+from PIL import ImageTk
 from bs4 import BeautifulSoup
 
 class bcolors:
