@@ -1,4 +1,5 @@
 import base64
+from typing import Counter
 import aiohttp
 import asyncio
 import aiofiles
@@ -26,7 +27,11 @@ class App:
 
     def buttonSearch(self):
         url = self.input.get()
-        asyncio.get_event_loop().run_until_complete(self.main(url))
+
+        if url:
+            asyncio.get_event_loop().run_until_complete(self.main(url))
+        else:
+            self.label.configure(text='Invalid URL', foreground='#ff0000')
 
     def onClick(self, event):
         position = self.listbox.curselection()
@@ -60,15 +65,18 @@ class App:
             return imgName
             
         async def getSourceCode(url):
-            async with aiohttp.ClientSession() as clientSession:
+            async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False) ,trust_env=True) as clientSession:
                 serverResponse = await clientSession.get(url)
                 sourceCode = await serverResponse.text()
                 return sourceCode   
                 
         sourceCode = await getSourceCode(urlToProcess)
         parsedSource = BeautifulSoup(sourceCode, 'html.parser')
-        
-        for imgItem in parsedSource.find_all('img', src=True):
+        allImg = parsedSource.find_all('img', src=True)
+        size = len(allImg)
+        self.progressbar.configure(maximum=size)
+
+        for imgItem in allImg:
             
             try:
                 imgName = imgItem['alt']
@@ -92,7 +100,7 @@ class App:
                 #Como apunte el connector se trata de un checker para el scertificado en este caso como muchas páginas no verifican este 
                 # certificado pues podemos también no verificarlo y de esta manera poder pasar el filtro y con trust_env=True 
                 # poder decirle al prgrama que en este caso queremos que confí en la web siempre    
-                async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(verify_ssl=False) ,trust_env=True) as clientSession:
+                async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False) ,trust_env=True) as clientSession:
                     serverResponse = await clientSession.get(imgSrc)
                     responseStatus = serverResponse.status
                     imgBytes = await serverResponse.read()
@@ -105,22 +113,31 @@ class App:
                         sys.stdout.write(bcolors.ENDC)
                         self.bytesfoto.append(imgBytes)
                         self.imgs.append(imgName)
-                        self.contador += 1
+                        self.counter += 1
+                        
+                        self.progressbar.step(self.counter)
+                        self.progressbar.update_idletasks()
+
+                        if self.progressbar['value'] < size:
+                            self.progressbar['value'] = size
                     else:
                         sys.stdout.write(bcolors.FAIL)
                         print(f'{imgName} : {imgSrc} -> STATUS FAILED : {responseStatus}')
                         sys.stdout.write(bcolors.ENDC)
+
+
+
         self.obsImg.subscribe(
             on_next = lambda img : (
-                self.listbox.insert(END, img)
-                
+                self.listbox.insert(END, img),
+                self.label.configure(text=f'Image counter: {self.counter} images', foreground='#00ff00')
             )
         )
 
     """
     Definicion de los atributos de la clase iniciales donde se guardan los datos que se usaran en el tkinter para la GUI
 
-    contador -- es el que lleva la cuenta de la cantidad de imágenes que se añaden a la lista
+    counter -- es el que lleva la cuenta de la cantidad de imágenes que se añaden a la lista
     window -- define la ventana de la GUI
     imgs -- lista en la que se guardan las URLs de las imágenes
     bytesfoto -- lista en la que se guardan las fotos en bytes para poder guardarlas en memoria
@@ -131,7 +148,7 @@ class App:
     def __init__(self):
 
         #Variables que contienen listas de imágenes nombres etc
-        self.contador = 0
+        self.counter = 0
         self.window = Tk()
         self.window.title = "Reactive-Programming"
         self.imgs = []
@@ -158,6 +175,10 @@ class App:
         #Barra de progreso
         self.progressbar = Progressbar(self.window)
         self.progressbar.grid(column=2, row=3)
+
+        #Cuenta de imágenes totales
+        self.label = Label(text='Searching for images')
+        self.label.grid(column=2, row=4)
 
         self.window.mainloop()
 
